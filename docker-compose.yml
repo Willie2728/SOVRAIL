@@ -1,0 +1,9 @@
+services:
+  sovrail:
+    build: .
+    ports: ["8080:8080"]
+    env_file: .env
+    volumes: ["sovrail_data:/data"]
+    restart: unless-stopped
+volumes:
+  sovrail_data:
