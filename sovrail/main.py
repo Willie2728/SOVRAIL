@@ -10,7 +10,7 @@ from .security import create_key,verify_key,verify_signature,audit
 from .controls import enforce_rate,enforce_daily,cache_key,cache_get,cache_put,idem_get,idem_put,circuit_allowed,circuit_success,circuit_failure
 from .providers import local_chat,openai_chat,anthropic_chat
 
-app=FastAPI(title='SOVRAIL AI — API Gateway Intelligence',version='2.2.0')
+app=FastAPI(title='SOVRAIL AI — API Gateway Intelligence',version='2.3.0')
 
 class KeyCreate(BaseModel):
     name:str; scopes:list[str]=['chat']; rpm:int=Field(120,ge=1,le=100000); daily_limit:int=Field(5000,ge=1); daily_budget_micros:int=Field(0,ge=0); expires_at:Optional[int]=None
@@ -25,13 +25,21 @@ class SavingsEstimateReq(BaseModel):
     policy_block_rate:float=Field(0,ge=0,le=1)
     current_fixed_monthly_cost:float=Field(0,ge=0)
     sovrail_fixed_monthly_cost:float=Field(0,ge=0)
+class SavingsReceiptReq(BaseModel):
+    baseline_monthly_calls:int=Field(...,ge=0)
+    baseline_gateway_cost_per_million:float=Field(...,ge=0)
+    sovrail_gateway_cost_per_million:float=Field(...,ge=0)
+    baseline_fixed_monthly_cost:float=Field(0,ge=0)
+    sovrail_fixed_monthly_cost:float=Field(0,ge=0)
+    window_days:int=Field(30,ge=1,le=30)
+    label:Optional[str]=None
 
 @app.on_event('startup')
 def startup(): db().close()
 
 @app.get('/health')
 def health():
-    return {'ok':True,'version':'2.2.0','providers':{'local':True,'openai':bool(settings.openai_key and settings.openai_model),'anthropic':bool(settings.anthropic_key and settings.anthropic_model),'tavus':bool(settings.tavus_key)},'signed_requests':settings.require_signatures}
+    return {'ok':True,'version':'2.3.0','providers':{'local':True,'openai':bool(settings.openai_key and settings.openai_model),'anthropic':bool(settings.anthropic_key and settings.anthropic_model),'tavus':bool(settings.tavus_key)},'signed_requests':settings.require_signatures}
 
 @app.post('/admin/keys')
 def admin_create(body:KeyCreate,authorization:Optional[str]=Header(None)):
@@ -107,4 +115,31 @@ def savings_estimate(body:SavingsEstimateReq):
         'annualized_savings':round(monthly_savings*12,2),
         'savings_percent':round(pct,2),
         'method':'Customer-supplied baseline and SOVRAIL execution assumptions; estimate is not a guarantee.'
+    }
+
+@app.post('/v1/savings/receipt')
+def savings_receipt(body:SavingsReceiptReq,x_sovrail_key:Optional[str]=Header(None)):
+    row=verify_key(x_sovrail_key,'usage'); c=db(); since=now()-(body.window_days*86400)
+    r=c.execute('SELECT COUNT(*) requests,COALESCE(SUM(cost_micros),0) cost_micros,COALESCE(AVG(latency_ms),0) avg_latency_ms FROM usage WHERE key_hash=? AND created_at>=?',(row['key_hash'],since)).fetchone()
+    observed_calls=int(r['requests'])
+    observed_cost_micros=int(r['cost_micros'])
+    baseline_window_calls=round(body.baseline_monthly_calls*(body.window_days/30))
+    baseline_variable=(baseline_window_calls/1_000_000)*body.baseline_gateway_cost_per_million
+    sovrail_variable=(observed_calls/1_000_000)*body.sovrail_gateway_cost_per_million
+    baseline_total=baseline_variable+(body.baseline_fixed_monthly_cost*(body.window_days/30))
+    sovrail_total=sovrail_variable+(body.sovrail_fixed_monthly_cost*(body.window_days/30))+(observed_cost_micros/1_000_000)
+    savings=max(0.0,baseline_total-sovrail_total)
+    annualized=(savings/body.window_days)*365 if body.window_days else 0.0
+    return {
+        'receipt_type':'observed_sovrail_usage_vs_customer_baseline',
+        'label':body.label,
+        'window_days':body.window_days,
+        'baseline_window_calls':baseline_window_calls,
+        'observed_sovrail_calls':observed_calls,
+        'observed_avg_latency_ms':round(float(r['avg_latency_ms'] or 0),2),
+        'baseline_window_cost':round(baseline_total,2),
+        'observed_sovrail_window_cost':round(sovrail_total,2),
+        'verified_window_savings':round(savings,2),
+        'annualized_savings_run_rate':round(annualized,2),
+        'method':'SOVRAIL request count and logged upstream cost are observed from this scoped key; baseline pricing and call volume are customer-supplied. This is an auditable comparison, not a guaranteed future saving.'
     }
