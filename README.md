@@ -1,22 +1,65 @@
 # SOVRAIL AI
-## API Gateway Intelligence — Sovereign API Runtime & Integration Layer v2.1
+## Sovereign API Execution, Cost Control & Integration Layer v2.3
 
-SOVRAIL is the Wilkerson Collective-controlled service boundary between WCL assets and local or third-party APIs. Assets receive SOVRAIL keys and call one stable interface. Provider secrets stay server-side. Local inference can be preferred; paid upstreams remain optional and still require valid provider accounts/credentials.
+SOVRAIL is the Wilkerson Collective-controlled execution boundary between applications, AI agents, MCP tools and third-party or internal APIs. Consuming assets receive scoped SOVRAIL credentials and call one stable interface. Provider secrets stay server-side.
+
+### What SOVRAIL is designed to do
+
+SOVRAIL moves API orchestration out of individual app platforms and into a controlled execution layer. This can reduce platform-side integration cost, centralize credentials, enforce budgets and create a measurable record of what the infrastructure actually cost to run.
+
+The enterprise value proposition is simple: **measure the customer's current API/middleware execution cost, run approved traffic through SOVRAIL, and produce a before/after savings receipt backed by observed SOVRAIL usage.**
 
 ### Core capabilities
 
 1. Scoped WCL-controlled credentials (`sov_...`) with scopes, expiration and revocation.
 2. Optional signed requests to reduce tampering and replay risk.
 3. Per-asset rate limits, daily request ceilings and upstream budget ceilings.
-4. Local-first routing with optional OpenAI and Anthropic fallback.
+4. Provider abstraction so consuming apps do not need provider-specific code.
 5. Circuit breakers and failover when providers are unhealthy.
 6. Idempotency to avoid accidental duplicate paid work.
 7. Exact-result caching for safe reusable responses.
-8. Provider abstraction so consuming apps do not need provider-specific code.
-9. Constrained Tavus proxying rather than an unsafe arbitrary URL proxy.
-10. Tamper-evident audit records.
-11. Usage telemetry for future WCL dashboards.
-12. Automated scaffolding for future WCL assets.
+8. Constrained third-party proxying rather than unsafe arbitrary URL proxying.
+9. Tamper-evident audit records.
+10. Usage telemetry for dashboards and enterprise reporting.
+11. Automated scaffolding for future WCL assets.
+12. Savings estimation and observed-usage savings receipts.
+
+### Enterprise Savings Engine
+
+SOVRAIL now exposes two economic measurement paths:
+
+- `POST /v1/savings/estimate` — models expected savings from customer-supplied baseline pricing and traffic assumptions.
+- `POST /v1/savings/receipt` — compares customer-supplied baseline pricing with **actual SOVRAIL usage recorded for a scoped key** over a 1–30 day window.
+
+The receipt returns:
+
+- baseline calls for the selected window
+- observed SOVRAIL calls
+- observed average latency
+- baseline execution cost
+- observed SOVRAIL execution cost
+- verified savings for the measured window
+- annualized savings run rate
+
+This is intentionally designed for pilots with mid-market and enterprise customers that need quantifiable ROI rather than an abstract platform claim.
+
+### Enterprise deployment model
+
+```text
+Applications / AI Agents / MCP Clients
+                 |
+                 v
+              SOVRAIL
+        -------------------
+        Auth | Policy | Cost
+        Usage | Audit | ROI
+        -------------------
+          |      |      |
+          v      v      v
+       APIs   SaaS   Internal Services
+```
+
+SOVRAIL does not need to replace the customer's applications. It becomes the execution and control layer between those applications and downstream services.
 
 ### Start locally
 
@@ -32,7 +75,7 @@ Create an asset key:
 curl -X POST http://localhost:8080/admin/keys \
   -H 'Authorization: Bearer YOUR_MASTER_KEY' \
   -H 'Content-Type: application/json' \
-  -d '{"name":"aurelis","scopes":["chat","usage"],"rpm":120,"daily_limit":5000}'
+  -d '{"name":"enterprise-pilot","scopes":["chat","usage"],"rpm":120,"daily_limit":5000}'
 ```
 
 Call SOVRAIL:
@@ -44,22 +87,29 @@ curl -X POST http://localhost:8080/v1/chat/completions \
   -d '{"provider":"auto","messages":[{"role":"user","content":"Hello"}]}'
 ```
 
-### Repeated integration
+Generate an observed savings receipt:
 
 ```bash
-python scripts/integrate.py /path/to/new-wcl-asset
+curl -X POST http://localhost:8080/v1/savings/receipt \
+  -H 'x-sovrail-key: sov_YOUR_ASSET_KEY' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "baseline_monthly_calls": 100000000,
+    "baseline_gateway_cost_per_million": 1.25,
+    "sovrail_gateway_cost_per_million": 0.30,
+    "window_days": 30,
+    "label": "Enterprise Pilot"
+  }'
 ```
-
-The consuming asset should know only its SOVRAIL URL and its scoped SOVRAIL credential. Do not scatter OpenAI, Anthropic, Tavus or other provider keys across individual products.
 
 ### SWARMER + SOVRAIL + KAMERON
 
-**SWARMER** decides whether a capability/provider/tool is trusted and permitted. **SOVRAIL** decides how an approved request is authenticated, budgeted, cached, routed and executed. **KAMERON** preserves trusted task state so interrupted work can resume.
+**SWARMER** decides whether a capability/provider/tool is trusted and permitted. **SOVRAIL** decides how an approved request is authenticated, budgeted, executed and measured. **KAMERON** preserves trusted task state so interrupted work can resume.
 
 ### Production hardening path
 
-SQLite is intentionally retained for a portable single-node package. For multi-instance deployment, move shared state to PostgreSQL/Redis, terminate TLS at trusted ingress, use managed secret storage, rotate master/upstream credentials, export audit/metrics data, and keep SOVRAIL behind SWARMER policy/security inspection where available.
+SQLite is intentionally retained for a portable single-node package. For multi-instance enterprise deployment, move shared state to PostgreSQL/Redis, terminate TLS at trusted ingress, use managed secret storage, rotate master/upstream credentials, export audit/metrics data, add tenant isolation and SSO/RBAC, and keep SOVRAIL behind SWARMER policy/security inspection where available.
 
 ### Economic boundary
 
-SOVRAIL can reduce commercial API usage through local execution, caching, duplicate prevention, budgets and provider selection. It does not bypass third-party authorization or billing. Any request actually executed by a paid provider remains subject to that provider's terms and pricing.
+SOVRAIL's enterprise thesis is not that every API becomes free. Its measurable claim is narrower and defensible: **where a customer currently pays an application platform, gateway or middleware layer to execute and orchestrate API traffic, SOVRAIL can move that work onto a controlled execution layer and quantify whether that displacement reduces cost.**
