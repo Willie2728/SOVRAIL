@@ -7,7 +7,7 @@ SOVRAIL is the Wilkerson Collective-controlled execution boundary between applic
 
 SOVRAIL moves API orchestration out of individual app platforms and into a controlled execution layer. This can reduce platform-side integration cost, centralize credentials, enforce budgets and create a measurable record of what the infrastructure actually cost to run.
 
-The enterprise value proposition is simple: **measure the customer's current API/middleware execution cost, run approved traffic through SOVRAIL, and produce a before/after savings receipt backed by observed SOVRAIL usage.**
+The enterprise value proposition is intentionally testable: **measure the customer's current API/middleware cost boundary, run a comparable approved workload through SOVRAIL, reconcile the observed request record with the cost sources actually captured, and produce a before/after comparison receipt.** A lower modeled comparison is not called verified savings unless workload comparability and cost coverage are established.
 
 ### Core capabilities
 
@@ -22,26 +22,28 @@ The enterprise value proposition is simple: **measure the customer's current API
 9. Tamper-evident audit records.
 10. Usage telemetry for dashboards and enterprise reporting.
 11. Automated scaffolding for future WCL assets.
-12. Savings estimation and observed-usage savings receipts.
+12. Savings estimation and observed-usage cost-comparison receipts.
 
 ### Enterprise Savings Engine
 
 SOVRAIL now exposes two economic measurement paths:
 
 - `POST /v1/savings/estimate` — models expected savings from customer-supplied baseline pricing and traffic assumptions.
-- `POST /v1/savings/receipt` — compares customer-supplied baseline pricing with **actual SOVRAIL usage recorded for a scoped key** over a 1–30 day window.
+- `POST /v1/savings/receipt` — compares customer-supplied baseline pricing with **observed SOVRAIL request usage for a scoped key** over a 1–30 day window plus whatever upstream cost has actually been written to the SOVRAIL usage log.
 
-The receipt returns:
+The current receipt can return:
 
-- baseline calls for the selected window
+- customer-supplied baseline calls for the selected window
 - observed SOVRAIL calls
 - observed average latency
-- baseline execution cost
-- observed SOVRAIL execution cost
-- verified savings for the measured window
-- annualized savings run rate
+- customer-modeled baseline execution cost
+- SOVRAIL comparison cost using configured gateway/fixed assumptions plus logged upstream cost when available
+- a modeled comparison delta for the measured window
+- an annualized modeled comparison run rate
 
-This is intentionally designed for pilots with mid-market and enterprise customers that need quantifiable ROI rather than an abstract platform claim.
+**Cost-coverage boundary:** observed request count is not the same thing as fully loaded observed cost. Current SOVRAIL routes may log zero upstream cost when provider billing data has not been reconciled into the usage record. Before any customer-facing savings claim is labeled verified, reconcile the relevant provider/API, compute, network, support, gateway and fixed-cost sources as applicable and confirm that the compared workloads are materially comparable. The legacy runtime response field named `verified_window_savings` should therefore be treated as a comparison field until that cost-coverage work is complete.
+
+This is intentionally designed for pilots with mid-market and enterprise customers that need quantifiable economics rather than an abstract platform claim.
 
 ### Enterprise deployment model
 
@@ -87,7 +89,7 @@ curl -X POST http://localhost:8080/v1/chat/completions \
   -d '{"provider":"auto","messages":[{"role":"user","content":"Hello"}]}'
 ```
 
-Generate an observed savings receipt:
+Generate an observed-usage comparison receipt:
 
 ```bash
 curl -X POST http://localhost:8080/v1/savings/receipt \
@@ -112,4 +114,4 @@ SQLite is intentionally retained for a portable single-node package. For multi-i
 
 ### Economic boundary
 
-SOVRAIL's enterprise thesis is not that every API becomes free. Its measurable claim is narrower and defensible: **where a customer currently pays an application platform, gateway or middleware layer to execute and orchestrate API traffic, SOVRAIL can move that work onto a controlled execution layer and quantify whether that displacement reduces cost.**
+SOVRAIL's enterprise thesis is not that every API becomes free. Its measurable claim is narrower and defensible: **where a customer currently pays an application platform, gateway or middleware layer to execute and orchestrate API traffic, SOVRAIL can move that work onto a controlled execution layer and measure whether a comparable workload produces a lower cost under a defined cost boundary.** Treat the result as a modeled comparison until the baseline, workload comparability, and all material cost sources have been reconciled to observed billing/usage evidence.
