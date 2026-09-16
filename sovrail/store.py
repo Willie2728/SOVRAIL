@@ -23,6 +23,16 @@ def db():
       opened_until INTEGER NOT NULL DEFAULT 0);
     CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY AUTOINCREMENT,event TEXT NOT NULL,payload TEXT NOT NULL,
       prev_hash TEXT NOT NULL,event_hash TEXT NOT NULL,created_at INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS execution_jobs(
+      id TEXT PRIMARY KEY,key_hash TEXT NOT NULL,objective TEXT NOT NULL,total_budget REAL NOT NULL,
+      spent REAL NOT NULL DEFAULT 0,tier TEXT NOT NULL DEFAULT 'luna-light',same_failure_count INTEGER NOT NULL DEFAULT 0,
+      no_progress_count INTEGER NOT NULL DEFAULT 0,last_failure TEXT,last_progress_fingerprint TEXT,
+      status TEXT NOT NULL DEFAULT 'active',created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL);
+    CREATE INDEX IF NOT EXISTS idx_execution_jobs_key ON execution_jobs(key_hash,created_at);
+    CREATE TABLE IF NOT EXISTS execution_events(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,job_id TEXT NOT NULL,event_type TEXT NOT NULL,payload TEXT NOT NULL,
+      created_at INTEGER NOT NULL,FOREIGN KEY(job_id) REFERENCES execution_jobs(id));
+    CREATE INDEX IF NOT EXISTS idx_execution_events_job ON execution_events(job_id,created_at);
     ''')
     c.commit(); return c
 
