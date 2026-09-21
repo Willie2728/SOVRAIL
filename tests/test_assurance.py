@@ -9,7 +9,11 @@ HEAD={'Authorization':'Bearer test-master'}
 def test_unauthorized_external_effect_blocks_and_contains():
     r=client.post('/v1/assurance/effect',headers=HEAD,json={'agent_id':'a1','action_id':'x1','system':'crm','resource':'customer/1','before_state':{'tier':'basic'},'after_state':{'tier':'admin'},'authorized_effect':False,'external_write':True,'evidence':{}})
     assert r.status_code==200
-    assert r.json()['decision']=='block_and_contain'
+    body=r.json()
+    assert body['decision']=='block_and_contain'
+    guide_names={g['name'] for g in body['framework_review']['guides']}
+    assert 'Bruce Schneier' in guide_names
+    assert 'Ron Ross' in guide_names
 
 def test_stale_context_requires_review():
     r=client.post('/v1/assurance/context',headers=HEAD,json={'agent_id':'a1','sources':[{'name':'inventory','stale':True}]})
