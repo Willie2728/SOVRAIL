@@ -8,6 +8,8 @@ from typing import Any, Literal
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
+from .wisdom_guides import relevant_lenses
+
 router = APIRouter(prefix="/v1/assurance", tags=["assurance"])
 
 _ATTESTATIONS: dict[str, dict[str, Any]] = {}
@@ -73,7 +75,13 @@ class CacheDecision(BaseModel):
 
 def _record(kind: str, payload: dict[str, Any]) -> dict[str, Any]:
     created_at = int(time.time())
-    canonical = {"kind": kind, "payload": payload, "created_at": created_at}
+    framework_review = relevant_lenses(kind, payload)
+    canonical = {
+        "kind": kind,
+        "payload": payload,
+        "created_at": created_at,
+        "framework_review": framework_review,
+    }
     attestation_id = f"att_{_stable_hash(canonical)[:24]}"
     record = {**canonical, "attestation_id": attestation_id, "evidence_hash": _stable_hash(canonical)}
     _ATTESTATIONS[attestation_id] = record
